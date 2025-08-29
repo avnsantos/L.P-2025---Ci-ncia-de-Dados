@@ -1,0 +1,180 @@
+# -*- coding: utf-8 -*-
+"""
+Script da aula de Linguagem de Programação de 29/08/2025.
+(Código gerado a partir das notas de aula mais correção por IA)
+Tópicos abordados:
+- Configuração avançada de logging.
+- Documentação de funções (docstrings) e o uso de help().
+- Tratamento de erros e exceções.
+- Marcação de funções como deprecadas.
+"""
+
+# 1. IMPORTAÇÕES
+# ==============================================================================
+# É uma boa prática agrupar todas as importações no início do arquivo.
+import logging
+import math
+import warnings
+from typing import Sequence, TypeAlias
+
+# 2. CONFIGURAÇÃO DO LOGGING
+# ==============================================================================
+# O logging é uma ferramenta fundamental para registrar eventos, erros e
+# informações durante a execução de um programa. Usá-lo é uma prática profissional.
+
+# Níveis de logging em ordem de severidade:
+# DEBUG(10), INFO(20), WARNING(30), ERROR(40), CRITICAL(50)
+# O logger só exibirá mensagens do nível definido para cima.
+# Ex: level=logging.INFO mostrará INFO, WARNING, ERROR, e CRITICAL.
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s:%(name)s:%(message)s",
+    force=True  # 'force=True' sobrescreve qualquer configuração de logger existente.
+)
+
+# Obtém uma instância do logger para este módulo.
+log = logging.getLogger("documentacao_avancada")
+
+# 3. DEFINIÇÃO DAS FUNÇÕES
+# ==============================================================================
+
+def juros_simples(capital: float, taxa_percentual: float, periodos: float) -> tuple[float, float]:
+    """Calcula montante e juros em regime de juros simples.
+
+    O TDD (Test-Driven Development) é uma abordagem onde se escreve o teste
+    (o que se espera que a função retorne) antes de implementar a função em si.
+
+    Parameters
+    ----------
+    capital : float
+        Valor inicial sobre o qual incidem os juros (deve ser >= 0).
+    taxa_percentual : float
+        Taxa por período (ex.: 5 para 5%).
+    periodos : float
+        Número de períodos (deve ser >= 0).
+
+    Returns
+    -------
+    tuple[float, float]
+        Uma tupla contendo (montante, juros), ambos arredondados
+        para 2 casas decimais.
+
+    Raises
+    ------
+    ValueError
+        Se qualquer um dos parâmetros for negativo.
+    """
+    # A docstring agora inclui a exceção que a função pode levantar.
+    if capital < 0 or taxa_percentual < 0 or periodos < 0:
+        log.error(f"Parâmetros negativos recebidos: C={capital}, i={taxa_percentual}, n={periodos}")
+        raise ValueError("Parâmetros negativos não são aceitos.")
+
+    if periodos > 60: # Exemplo de log de aviso
+        log.warning("Período próximo ao limite para cálculo considerado razoável.")
+
+    taxa = taxa_percentual / 100.0
+    juros = capital * taxa * periodos
+    montante = capital + juros
+
+    return (round(montante, 2), round(juros, 2))
+
+
+# Funções placeholder, provavelmente para serem implementadas depois.
+# A presença delas pode ser útil para definir a estrutura do módulo,
+# especialmente se for usado `__all__`.
+def juros_compostos():
+    """Calcula o montante em regime de juros compostos."""
+    pass
+
+
+def taxa_efetiva():
+    """Calcula a taxa efetiva a partir de uma taxa nominal."""
+    pass
+
+
+def funcao_antiga(valor: float) -> float:
+    """[DEPRECATED] Use `math.sqrt` em vez desta função.
+
+    Esta função será removida em uma versão futura da aplicação (ex: 2.0.0).
+    A notação SemVer (Major.Minor.Patch) indica:
+    - MAJOR: Mudanças incompatíveis com versões anteriores.
+    - MINOR: Adição de funcionalidades compatíveis.
+    - PATCH: Correções de bugs.
+    """
+    # warnings.warn é usado para notificar o desenvolvedor sobre a depreciação.
+    warnings.warn(
+        'funcao_antiga() está deprecada e será removida em versão futura. Use "math.sqrt()".',
+        category=DeprecationWarning,
+        stacklevel=2  # Aponta para a linha que CHAMOU a função, e não a linha do warning.
+    )
+    return math.sqrt(valor)
+
+
+# 4. FUNÇÕES DE DEMONSTRAÇÃO
+# ==============================================================================
+
+def demonstracao_logging():
+    """Executa exemplos de mensagens de log."""
+    print("\n--- [Demonstração de Logging] ---\n")
+    log.info('Tarefa Iniciada')
+    # Esta mensagem não aparecerá, pois o nível configurado é INFO (20) e DEBUG é (10).
+    log.debug("Esta mensagem de debug não deveria ser visível.")
+    
+    # Exemplo de chamada que gera um log de aviso dentro da função
+    print("Calculando juros para 72 períodos (deve gerar um WARNING):")
+    juros_simples(1000, 5, 72)
+
+    # Exemplo de chamada que gera um log de erro e uma exceção
+    try:
+        juros_simples(-100, 5, 12)
+    except ValueError as e:
+        # O log.error já foi emitido dentro da função antes do raise.
+        print(f"Exceção capturada como esperado: {e}")
+    print("-" * 35)
+
+
+def demonstracao_pydoc_help():
+    """Demonstra o uso de help() e o acesso direto a __doc__."""
+    print("\n--- [Demonstração de help() e __doc__] ---\n")
+    print(">>> help(juros_simples)")
+    help(juros_simples)
+
+    docstring_completa = juros_simples.__doc__
+    
+    # O professor mencionou que `__doc__` pode não ser uma string (embora raro).
+    # Este 'if' garante que o código não quebre se `__doc__` for None.
+    if isinstance(docstring_completa, str):
+        # .strip() remove espaços em branco no início/fim.
+        # .splitlines() divide a string em uma lista de linhas.
+        # [0] pega o primeiro item da lista (a primeira linha).
+        primeira_linha = docstring_completa.strip().splitlines()[0]
+        print("\n- Primeira linha da docstring de juros_simples:", primeira_linha)
+    print("-" * 35)
+
+
+def demonstracao_deprecacao():
+    """Demonstra o aviso de uma função deprecada."""
+    print("\n--- [Demonstração de Função Deprecada] ---\n")
+    print("Chamando funcao_antiga(16)...")
+    resultado = funcao_antiga(16)
+    print(f"Resultado: {resultado}")
+    print("Observe o DeprecationWarning que foi exibido no console.")
+    print("-" * 35)
+
+
+# 5. EXECUÇÃO PRINCIPAL
+# ==============================================================================
+# O bloco `if __name__ == "__main__":` é executado apenas quando o script
+# é rodado diretamente, não quando é importado por outro script.
+
+if __name__ == "__main__":
+    print("#" * 60)
+    print("INICIANDO DEMONSTRAÇÕES DA AULA DE 29/08/25")
+    print("#" * 60)
+
+    demonstracao_logging()
+    demonstracao_pydoc_help()
+    demonstracao_deprecacao()
+
+    print("\nFim das demonstrações.")
