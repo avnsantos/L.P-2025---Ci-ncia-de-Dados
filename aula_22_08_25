@@ -1,0 +1,182 @@
+# -*- coding: utf-8 -*-
+"""
+Script da aula de Linguagem de Programação de 22/08/2025.
+Tópicos abordados:
+- O que são exceções (Erros).
+- Como testar exceções com doctest.
+- O bloco try/except para tratamento de erros.
+- Capturando tipos específicos de exceções.
+- A hierarquia das classes de exceção.
+- Como inspecionar e relançar exceções.
+"""
+
+import doctest
+
+# ==============================================================================
+# 1. DOCUMENTANDO E TESTANDO ERROS COM DOCTEST
+# ==============================================================================
+# Antes de tratar os erros, podemos usar o doctest para garantir que
+# nossa função falha da maneira esperada quando recebe entradas inválidas.
+
+def soma(num1, num2):
+    """Soma dois números.
+
+    Esta docstring inclui um teste que verifica se a função levanta um
+    TypeError corretamente quando tentamos somar um número e um texto.
+
+    >>> soma(10, 5)
+    15
+    >>> soma(100, "Carlos Ivan")
+    Traceback (most recent call last):
+        ...
+    TypeError: unsupported operand type(s) for +: 'int' and 'str'
+    """
+    return num1 + num2
+
+
+# ==============================================================================
+# 2. O PROBLEMA: EXCEÇÕES NÃO TRATADAS
+# ==============================================================================
+# Quando um erro ocorre e não é tratado, ele interrompe a execução do programa.
+# O exemplo abaixo mostra um NameError, pois a variável 'y' não foi definida.
+
+def demonstra_erro_nao_tratado():
+    """Demonstra o que acontece quando um NameError não é tratado."""
+    print("\n--- 2. Demonstração de Erro Não Tratado (NameError) ---")
+    try:
+        x = 10
+        # A linha abaixo irá falhar e levantar um NameError
+        resultado = x / y
+        print(resultado)
+    except NameError:
+        print("Ocorreu um NameError: a variável 'y' não foi definida.")
+        print("O programa quebraria neste ponto sem um 'try...except'.")
+
+
+# ==============================================================================
+# 3. A SOLUÇÃO BÁSICA: O BLOCO TRY...EXCEPT
+# ==============================================================================
+# Para "proteger" uma linha de código que pode falhar, nós a colocamos
+# dentro de um bloco 'try'. Se um erro ocorrer, o bloco 'except' é executado.
+
+def demonstra_try_except_generico():
+    """Demonstra o uso de um bloco 'except' genérico."""
+    print("\n--- 3. Demonstração do Bloco 'try...except' Genérico ---")
+    x = 10
+    resultado = None  # É uma boa prática inicializar a variável
+    try:
+        # A variável 'y' ainda não existe, causando um NameError
+        resultado = x / y
+    except:
+        # Este 'except' captura QUALQUER exceção.
+        print("Ocorreu uma exceção! O programa foi protegido e não quebrou.")
+        resultado = "Valor não calculado devido a um erro."
+
+    print("Resultado final:", resultado)
+
+
+# ==============================================================================
+# 4. TRATANDO EXCEÇÕES ESPECÍFICAS
+# ==============================================================================
+# É uma prática melhor capturar exceções específicas, para que possamos
+# tratar cada tipo de erro de uma forma diferente.
+
+def demonstra_except_especifico():
+    """Demonstra como capturar diferentes tipos de erro."""
+    print("\n--- 4. Demonstração de 'except' Específicos ---")
+    x = 10
+    y = 0  # Agora 'y' existe, mas é zero, o que causará outro erro.
+    resultado = None
+    try:
+        # A linha abaixo irá falhar, levantando um ZeroDivisionError
+        resultado = x / y
+    except ZeroDivisionError:
+        print("Erro capturado: Divisão por Zero!")
+        resultado = "Não é possível dividir por zero."
+    except NameError:
+        print("Erro capturado: Variável não existe!")
+        resultado = "Variável não definida."
+    except:
+        # Um 'except' genérico no final pode capturar erros inesperados.
+        print("Não vi esse erro chegando!")
+        resultado = "Erro desconhecido."
+
+    print("Resultado final:", resultado)
+
+
+# ==============================================================================
+# 5. A HIERARQUIA DAS EXCEÇÕES
+# ==============================================================================
+# As exceções em Python têm uma hierarquia (ex: ZeroDivisionError é um tipo
+# de ArithmeticError). A ordem dos blocos 'except' importa: o mais específico
+# deve vir antes do mais geral.
+
+def demonstra_hierarquia_de_excecoes():
+    """Demonstra a importância da ordem na captura de exceções."""
+    print("\n--- 5. Demonstração da Hierarquia das Exceções ---")
+    x = 10
+    y = 0
+    resultado = None
+    try:
+        resultado = x / y
+    except ArithmeticError as erro:
+        # ZeroDivisionError é uma subclasse de ArithmeticError.
+        # Se este bloco viesse primeiro, ele capturaria a divisão por zero,
+        # e o bloco específico de ZeroDivisionError nunca seria alcançado.
+        print(f"Erro Aritmético Genérico capturado! Tipo: {type(erro).__name__}")
+        # A linha abaixo mostra toda a "linhagem" (hierarquia) do erro
+        print("Hierarquia (MRO):", [cls.__name__ for cls in erro.__class__.mro()])
+        resultado = "Cálculo não realizado!"
+    # except ZeroDivisionError:
+    #     print("Este bloco nunca seria executado se viesse depois de ArithmeticError")
+
+    print("Resultado final:", resultado)
+
+
+# ==============================================================================
+# 6. RELANÇANDO UMA EXCEÇÃO
+# ==============================================================================
+# Às vezes, você quer capturar um erro, fazer algo (como registrar em um log),
+# mas depois deixar o erro continuar para que o programa pare ou para que
+# outro bloco 'try...except' de nível superior o capture.
+
+def demonstra_relancamento_de_excecao():
+    """Demonstra como usar 'raise' para relançar uma exceção."""
+    print("\n--- 6. Demonstração de 'raise' para Relançar Exceção ---")
+    try:
+        resultado = 10 / 0
+    except Exception as erro:
+        print("Capturei o erro! Vou registrar em um log...")
+        print("... Log registrado. Agora vou relançar o erro para que o sistema saiba que falhou.")
+        raise erro # A palavra-chave 'raise' relança a exceção capturada
+
+
+# ==============================================================================
+# EXECUÇÃO PRINCIPAL
+# ==============================================================================
+if __name__ == "__main__":
+    print("=" * 60)
+    print("INICIANDO DEMONSTRAÇÕES DA AULA DE 22/08/25")
+    print("=" * 60)
+
+    print("\n--- 1. Executando Doctests da função 'soma' ---")
+    # O verbose=True mostra um relatório detalhado de todos os testes.
+    doctest.testmod(verbose=True)
+
+    demonstra_erro_nao_tratado()
+    demonstra_try_except_generico()
+    demonstra_except_especifico()
+    demonstra_hierarquia_de_excecoes()
+
+    try:
+        demonstra_relancamento_de_excecao()
+    except ZeroDivisionError:
+        print("A exceção relançada foi capturada aqui, no nível superior!")
+
+    print("\n" + "="*60)
+    print("CONCEITOS FINAIS:")
+    print("- CALL STACK / TRACEBACK: É a pilha de chamadas de função que o Python")
+    print("  mostra quando um erro ocorre. Ele permite rastrear a origem do erro,")
+    print("  desde o sistema operacional, passando pelo interpretador, até a linha")
+    print("  exata na função onde o problema aconteceu.")
+    print("="*60)
