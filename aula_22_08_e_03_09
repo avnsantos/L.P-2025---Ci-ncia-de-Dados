@@ -1,0 +1,155 @@
+# -*- coding: utf-8 -*-
+"""
+Script das aulas de Linguagem de Programação (29/08 e 03/09).
+Tópicos abordados:
+- Logging, Docstrings detalhadas, Funções deprecadas.
+- TypeAlias para anotações de tipo complexas.
+- Criação de uma Interface de Linha de Comando (CLI) com `argparse`.
+- Estrutura de um programa com função `main` e `if __name__ == "__main__"`.
+"""
+# 1. IMPORTAÇÕES E CONFIGURAÇÕES INICIAIS
+# ==============================================================================
+import argparse
+import logging
+import math
+import sys
+import textwrap
+import warnings
+from typing import Sequence, TypeAlias
+# Versão do módulo para referência
+__version__ = "1.1.0"
+# O professor mostrou como usar TypeAlias para criar um "apelido" para um tipo
+# complexo, tornando o código mais legível. Isso é útil para provas!
+Resultado: TypeAlias = tuple[float, float]
+# Configuração do Logging
+# Níveis: DEBUG(10), INFO(20), WARNING(30), ERROR(40), CRITICAL(50)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s:%(name)s:%(message)s",
+    force=True
+)
+log = logging.getLogger("financeira_cli")
+
+# 2. FUNÇÕES DE CÁLCULO (LÓGICA PRINCIPAL)
+# ==============================================================================
+def juros_simples(capital: float, taxa_percentual: float, periodos: float) -> Resultado:
+    """Calcula montante e juros em regime de juros simples."""
+    if capital < 0 or taxa_percentual < 0 or periodos < 0:
+        log.error("Parâmetros negativos recebidos em juros_simples.")
+        raise ValueError("Parâmetros negativos não são aceitos.")
+    juros = capital * (taxa_percentual / 100.0) * periodos
+    montante = capital + juros
+    return (round(montante, 2), round(juros, 2))
+
+# --- [DEVER DE CASA] Implementação das novas funções ---
+def juros_compostos(capital: float, taxa_percentual: float, periodos: float) -> Resultado:
+    """Calcula montante e juros em regime de juros compostos."""
+    if capital < 0 or taxa_percentual < 0 or periodos < 0:
+        log.error("Parâmetros negativos recebidos em juros_compostos.")
+        raise ValueError("Parâmetros negativos não são aceitos.")
+    taxa = taxa_percentual / 100.0
+    montante = capital * pow((1 + taxa), periodos)
+    juros = montante - capital
+    return (round(montante, 2), round(juros, 2))
+
+def taxa_efetiva(taxa_anual_percentual: float, periodos_por_ano: int) -> float:
+    """Calcula a taxa efetiva para um período a partir de uma taxa anual."""
+    if taxa_anual_percentual < 0 or periodos_por_ano <= 0:
+        log.error("Parâmetros inválidos recebidos em taxa_efetiva.")
+        raise ValueError("Taxa não pode ser negativa e períodos devem ser > 0.")
+    taxa_anual = taxa_anual_percentual / 100.0
+    taxa_efetiva_periodo = pow(1 + taxa_anual, 1 / periodos_por_ano) - 1
+    # Retorna a taxa em formato percentual
+    return round(taxa_efetiva_periodo * 100, 4)
+
+# 3. FUNÇÕES DA INTERFACE DE LINHA DE COMANDO (CLI)
+# ==============================================================================
+def construir_parser() -> argparse.ArgumentParser:
+    """
+    Cria um parser de linha de comando para o programa de matemática financeira.
+    
+    Um "parser" é um objeto que consome strings (os argumentos da linha de
+    comando) e retorna objetos estruturados com base nessas strings.
+    """
+    parser_principal = argparse.ArgumentParser(
+        prog="financeira_cli",
+        description="Calculadora financeira via linha de comando.",
+        # RawDescriptionHelpFormatter preserva as quebras de linha na formatação
+        # da ajuda, o que é ótimo para exibir exemplos.
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=textwrap.dedent(
+            """
+            Exemplos de uso:
+              python %(prog)s simples --capital 1000 --taxa 5 --tempo 12
+              python %(prog)s compostos --capital 1000 --taxa 5 --tempo 12
+              python %(prog)s efetiva --taxa-anual 12 --periodos 12
+            """
+        )
+    )
+    # Mostra a versão do programa quando chamado com --version
+    parser_principal.add_argument(
+        "-v", "--version", action="version", version=f"%(prog)s {__version__}"
+    )
+    # Cria a estrutura de subcomandos (simples, compostos, etc.)
+    subcomandos = parser_principal.add_subparsers(
+        dest="nome_comando",
+        required=True,
+        help="Subcomando a ser executado"
+    )
+    # Subcomando para Juros Simples
+    parser_simples = subcomandos.add_parser("simples", help="Calcula juros simples")
+    parser_simples.add_argument("--capital", type=float, required=True, help="Capital inicial (ex: 1000.00)")
+    parser_simples.add_argument("--taxa", dest="taxa_percentual", type=float, required=True, help="Taxa percentual por período (ex: 5 para 5%%)")
+    parser_simples.add_argument("--tempo", dest="periodos", type=float, required=True, help="Número de períodos")
+    # --- [DEVER DE CASA] Adição dos novos subcomandos ---
+    # Subcomando para Juros Compostos
+    parser_compostos = subcomandos.add_parser("compostos", help="Calcula juros compostos")
+    parser_compostos.add_argument("--capital", type=float, required=True, help="Capital inicial (ex: 1000.00)")
+    parser_compostos.add_argument("--taxa", dest="taxa_percentual", type=float, required=True, help="Taxa percentual por período (ex: 5 para 5%%)")
+    parser_compostos.add_argument("--tempo", dest="periodos", type=float, required=True, help="Número de períodos")
+    # Subcomando para Taxa Efetiva
+    parser_efetiva = subcomandos.add_parser("efetiva", help="Calcula a taxa efetiva por período")
+    parser_efetiva.add_argument("--taxa-anual", dest="taxa_anual_percentual", type=float, required=True, help="Taxa anual em percentual (ex: 12 para 12%%)")
+    parser_efetiva.add_argument("--periodos", dest="periodos_por_ano", type=int, required=True, help="Número de períodos no ano (ex: 12 para meses)")
+    return parser_principal
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """
+    Função principal que executa a CLI.
+    Ela pega os argumentos da linha de comando, chama o parser e direciona
+    para a função de cálculo correta.
+    """
+    log.info("Analisador de argumentos CLI iniciado.")
+    parser = construir_parser()
+    argumentos = parser.parse_args(argv) # Se argv for None, usa sys.argv[1:]
+    try:
+        if argumentos.nome_comando == "simples":
+            montante, juros = juros_simples(**vars(argumentos))
+            print(f"Juros Simples -> Montante: R$ {montante:.2f} | Juros: R$ {juros:.2f}")
+        elif argumentos.nome_comando == "compostos":
+            montante, juros = juros_compostos(**vars(argumentos))
+            print(f"Juros Compostos -> Montante: R$ {montante:.2f} | Juros: R$ {juros:.2f}")
+        elif argumentos.nome_comando == "efetiva":
+            # Usando vars() para desempacotar os argumentos nos parâmetros da função
+            taxa = taxa_efetiva(**vars(argumentos))
+            print(f"Taxa Efetiva por Período: {taxa:.4f}%")
+        
+        else:
+            # Este caso não deve ocorrer devido ao 'required=True' nos subcomandos
+            parser.error(f"Subcomando desconhecido: {argumentos.nome_comando}")
+    
+    except ValueError as e:
+        log.critical(f"Erro de valor nos parâmetros fornecidos: {e}")
+        print(f"Erro: {e}", file=sys.stderr)
+        return 1 # Retorna um código de erro
+    return 0 # Retorna 0 em caso de sucesso
+
+# 4. CÓDIGO DE EXECUÇÃO (DRIVER CODE)
+# ==============================================================================
+if __name__ == "__main__":
+    # Esta é a entrada do programa. O "Driver Code" chama a função principal.
+    # A função main pega os argumentos que vieram do terminal (sys.argv)
+    # e chama a lógica da CLI.
+    # `raise SystemExit` é a forma padrão de encerrar um programa CLI,
+    # passando o código de retorno (0 para sucesso, >0 para erro).
+    raise SystemExit(main())
