@@ -1,0 +1,118 @@
+# -*- coding: utf-8 -*-
+"""
+Script da aula de Decorator Factory Avançado.
+
+Data: 10/09/2025
+Tópico: Construção de um decorator @retry para executar uma função
+        múltiplas vezes em caso de falha, com delay e backoff exponencial.
+"""
+
+import time
+from functools import wraps
+
+# ==============================================================================
+# 1. O DECORATOR FACTORY: retry()
+# ==============================================================================
+
+def retry(retries=3, exception=Exception, delay=0.1, backoff=1.0):
+    """
+    Decorator Factory que cria um decorator para tentar executar uma função
+    múltiplas vezes caso ela levante uma exceção específica.
+    """
+    # --- Bloco 1: Validação dos Parâmetros ---
+    # Um bom código defensivo sempre valida suas entradas.
+    if not isinstance(retries, int) or retries < 1:
+        raise ValueError("retries deve ser um inteiro >= 1")
+    if not isinstance(delay, (int, float)) or delay < 0:
+        raise ValueError("delay deve ser um int ou float >= 0")
+    if not isinstance(backoff, (int, float)) or backoff < 1:
+        raise ValueError("backoff deve ser um int ou float >= 1.0")
+
+    # --- Bloco 2: Tratamento do Parâmetro de Exceção ---
+    # O professor aqui garante que `exception` seja sempre uma tupla,
+    # para que o `except` possa lidar com um ou vários tipos de erro.
+
+    if not isinstance(exception, tuple):
+        exception = (exception,) # Transforma um único tipo de exceção em uma tupla
+
+    for exc in exception:
+        if not (isinstance(exc, type) and issubclass(exc, BaseException)):
+            raise TypeError("O parâmetro 'exception' deve conter classes de Exceção.")
+
+    # --- Bloco 3: O Decorator Interno ---
+    # Como `retry` aceita argumentos, ela é uma "Factory" que retorna o decorator.
+    def decorador(func):
+        
+        # O `@wraps` é fundamental! Você perguntou para que serve.
+        # RESPOSTA: Ele copia os metadados da função original (como o nome `__name__`
+        # e a docstring `__doc__`) para a função `wrapper`. Sem ele, a função
+        # `pode_falhar` passaria a se chamar "wrapper", o que atrapalha a
+        # depuração e a documentação.
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            tentativa_atual = 1
+            atraso_atual = float(delay)
+            
+            # --- Bloco 4: A Lógica de Tentativas (Loop) ---
+            while True:
+                try:
+                    # Tenta executar a função original. Se der certo, o resultado
+                    # é retornado e a função termina.
+                    return func(*args, **kwargs)
+                
+                # Se a função levantar uma das exceções esperadas...
+                except exception as err:
+                    # O 'as err' captura o objeto da exceção para podermos usá-lo.
+                    
+                    # Verifica se já esgotamos as tentativas.
+                    if tentativa_atual >= retries:
+                        # Se sim, desiste e levanta o último erro capturado.
+                        raise err
+                    
+                    nome_erro = type(err).__name__
+                    msg = str(err)
+                    print(f"Tentativa {tentativa_atual} falhou ({nome_erro}: {msg}). "
+                          f"Nova tentativa em {atraso_atual:.3f}s...")
+                    
+                    # Espera pelo tempo de atraso definido.
+                    if atraso_atual > 0:
+                        time.sleep(atraso_atual)
+                    
+                    # Atualiza os contadores para a próxima iteração do loop.
+                    tentativa_atual += 1
+                    atraso_atual *= backoff # Backoff: aumenta o tempo de espera a cada tentativa.
+
+        return wrapper
+    return decorador
+
+
+# ==============================================================================
+# 2. FUNÇÃO DE TESTE ("MOCK")
+# ==============================================================================
+# Esta função simula uma operação instável que falha algumas vezes
+# antes de funcionar. É a nossa "cobaia" para o decorator.
+
+contador_falhas = 0
+
+@retry(retries=3, exception=ValueError, delay=0.2, backoff=2.0)
+def pode_falhar():
+    """
+    Função que simula uma falha nas duas primeiras chamadas
+    e tem sucesso na terceira.
+    """
+    global contador_falhas
+    
+    if contador_falhas < 2:
+        contador_falhas += 1
+        raise ValueError("A conexão falhou temporariamente!")
+        
+    return "Conexão estabelecida com sucesso!"
+
+
+# ==============================================================================
+# 3. EXECUÇÃO (DRIVER CODE)
+# ==============================================================================
+if __name__ == "__main__":
+    print("Executando a função que pode falhar (com @retry)...")
+    resultado_final = pode_falhar()
+    print(f"\nResultado final: {resultado_final}")
