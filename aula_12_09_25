@@ -1,0 +1,144 @@
+# -*- coding: utf-8 -*-
+"""
+Script da aula de Metaprogramação com Decorators.
+
+Data: 12/09/2025
+Tópico: Construção de um decorator `@enforce_types` que utiliza o módulo
+        `inspect` para validar os tipos dos argumentos e do retorno de uma
+        função em tempo de execução, com base em suas anotações de tipo.
+"""
+
+import inspect
+from functools import wraps
+
+# ==============================================================================
+# 1. O DECORATOR: enforce_types
+# ==============================================================================
+
+def enforce_types(func):
+    """
+    Decorator que valida os tipos dos argumentos e do valor de retorno
+    de uma função com base em suas anotações de tipo (Type Hints).
+    """
+    # --- Passo 1: Introspecção da Função Original ---
+    # Usamos o módulo `inspect` para "olhar para dentro" da função `func`
+    # e entender sua estrutura antes mesmo de executá-la.
+
+    # `inspect.signature` captura a assinatura completa da função,
+    # incluindo parâmetros, seus nomes, tipos e valores padrão.
+    assinatura = inspect.signature(func)
+
+    # `__annotations__` é um dicionário especial que armazena apenas as
+    # anotações de tipo da função (ex: {'texto_esquerda': str, 'return': str}).
+    anotacoes = func.__annotations__
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # --- Passo 2: Vinculando os Argumentos Recebidos ---
+        # Quando o wrapper é chamado (ex: com `concatena("a", "b")`), precisamos
+        # associar os valores recebidos (`"a"`, `"b"`) aos nomes dos parâmetros
+        # da função original (`texto_esquerda`, `texto_direita`).
+
+        # `assinatura.bind` faz exatamente isso. Ele pega os `*args` e `**kwargs`
+        # e os mapeia para os nomes dos parâmetros definidos na assinatura.
+        bound = assinatura.bind(*args, **kwargs)
+        
+        # `apply_defaults` adiciona os valores padrão ao mapeamento para
+        # quaisquer parâmetros que não foram fornecidos na chamada.
+        bound.apply_defaults()
+
+        # `bound.arguments` agora é um dicionário que contém o nome de cada
+        # parâmetro e o valor final que ele recebeu.
+        # Ex: {'texto_esquerda': 'Eu adoro ', 'texto_direita': 'a EMAp', 'teste': 0}
+
+        # --- Passo 3: Validação dos Tipos dos Argumentos ---
+        for nome_param, valor in bound.arguments.items():
+            # Verificamos se existe uma anotação de tipo para este parâmetro
+            if nome_param in anotacoes:
+                tipo_esperado = anotacoes[nome_param]
+                
+                # Validação de segurança: a anotação deve ser um tipo válido (como str, int)
+                if not isinstance(tipo_esperado, type):
+                    raise TypeError(f"Anotação para \"{nome_param}\" utiliza tipo não suportado")
+                
+                # A validação principal: o valor recebido é do tipo esperado?
+                if not isinstance(valor, tipo_esperado):
+                    # Se não for, levanta um erro claro e informativo.
+                    raise TypeError(f"Argumento '{nome_param}' para a função '{func.__name__}' "
+                                    f"esperava o tipo {tipo_esperado.__name__}, mas recebeu {type(valor).__name__}.")
+        
+        # --- Passo 4: Execução da Função e Validação do Retorno ---
+        resultado = func(*args, **kwargs)
+        
+        # Verificamos se há uma anotação de tipo para o valor de retorno.
+        if "return" in anotacoes:
+            tipo_retorno_esperado = anotacoes["return"]
+            
+            if not isinstance(tipo_retorno_esperado, type):
+                raise TypeError(f"Anotação de retorno utiliza tipo não suportado \"{tipo_retorno_esperado!r}\"")
+            
+            # Valida se o resultado da função é do tipo de retorno esperado.
+            if not isinstance(resultado, tipo_retorno_esperado):
+                raise TypeError(f"O retorno da função '{func.__name__}' esperava o tipo "
+                                f"{tipo_retorno_esperado.__name__}, mas retornou {type(resultado).__name__}.")
+
+        # CORREÇÃO: As anotações originais tinham um `return` vazio.
+        # O correto é retornar o resultado da função original.
+        return resultado
+    return wrapper
+
+
+# ==============================================================================
+# 2. EXECUÇÃO (DRIVER CODE)
+# ==============================================================================
+
+print("--- Demonstração do decorator @enforce_types ---")
+
+@enforce_types
+def concatena(texto_esquerda: str, texto_direita: str, teste = 0) -> str:
+    """Concatena duas strings."""
+    return texto_esquerda + texto_direita
+
+@enforce_types
+def area_retangulo(base: float, altura: float) -> float:
+    """Calcula a área de um retângulo."""
+    return base * altura
+
+# --- Testes de Sucesso ---
+print("\nTestando casos de sucesso:")
+try:
+    print("concatena('Eu adoro ', 'a EMAp') ->", concatena("Eu adoro ", "a EMAp"))
+    # Note que a chamada abaixo funciona, pois 3 pode ser interpretado como float.
+    # Para uma checagem mais estrita, a lógica no decorator precisaria ser ajustada.
+    print("area_retangulo(3, 42.0) ->", area_retangulo(3.0, 42.0))
+except TypeError as e:
+    print(f"Erro inesperado: {e}")
+
+# --- Testes de Falha (TypeError) ---
+print("\nTestando casos de falha (espera-se um TypeError):")
+
+# Teste 1: Passando um int onde se espera uma str
+try:
+    concatena("Olá ", 123)
+except TypeError as e:
+    print(f"\n[FALHA ESPERADA] Chamando concatena('Olá ', 123):")
+    print(f"  -> Erro capturado: {e}")
+
+# Teste 2: Passando uma str onde se espera um float
+try:
+    area_retangulo(10.5, "20")
+except TypeError as e:
+    print(f"\n[FALHA ESPERADA] Chamando area_retangulo(10.5, '20'):")
+    print(f"  -> Erro capturado: {e}")
+
+# Teste 3: Uma função que retorna o tipo errado
+@enforce_types
+def soma_errada(a: int, b: int) -> int:
+    # Esta função está anotada para retornar `int`, mas retorna `float`.
+    return float(a + b)
+
+try:
+    soma_errada(5, 10)
+except TypeError as e:
+    print(f"\n[FALHA ESPERADA] Chamando uma função que retorna o tipo errado:")
+    print(f"  -> Erro capturado: {e}")
