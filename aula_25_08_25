@@ -1,0 +1,156 @@
+# -*- coding: utf-8 -*-
+"""
+Script da aula de Tratamento de Exceções Avançado.
+
+Data: 25/08/2025
+Tópicos:
+- Criação de hierarquias de exceções customizadas.
+- O que é "mocar" uma função para simular cenários.
+- A estrutura completa `try...except...else...finally`.
+- Encadeamento de exceções com `raise ... from ...` para criar
+  erros de domínio claros sem perder o contexto técnico.
+"""
+
+# ==============================================================================
+# 1. DEFININDO UMA HIERARQUIA DE EXCEÇÕES CUSTOMIZADAS
+# ==============================================================================
+# O professor explicou que podemos criar nossos próprios erros herdando de
+# `Exception`. Isso é útil para criar "erros de domínio", ou seja, erros que
+# fazem sentido para a lógica do nosso aplicativo (ex: erro de autenticação).
+
+class AppError(Exception):
+    """Classe base para todos os erros de domínio da nossa aplicação."""
+    pass
+
+class AuthenticationError(AppError):
+    """Representa uma falha de autenticação (ex: login/senha inválidos)."""
+    pass
+
+class AuthorizationError(AppError):
+    """Representa uma falha de autorização (ex: usuário sem permissão)."""
+    pass
+
+class RateLimitExceededError(AppError):
+    """Representa que o cliente excedeu o limite de requisições."""
+    pass
+
+class ResourceNotFoundError(AppError):
+    """Representa um recurso que não foi encontrado (ex: chave em um dicionário)."""
+    pass
+
+
+# ==============================================================================
+# 2. SIMULANDO CENÁRIOS COM UMA FUNÇÃO "MOCK"
+# ==============================================================================
+# "Mocar" uma função significa criar uma versão falsa/simulada dela para
+# fins de teste. É extremamente útil para forçar cenários de erro ou sucesso.
+
+def mock_obter_recurso(simular: str) -> str:
+    """
+    Função mockada que simula a busca de um recurso, podendo levantar
+    diferentes erros de propósito.
+    """
+    # PONTO DE DÚVIDA: "não entendi por que o raise"
+    # RESPOSTA: A palavra-chave `raise` é como se diz "levante um erro agora!".
+    # O propósito desta função é justamente simular situações onde erros
+    # acontecem, então usamos `raise` para deliberadamente disparar um erro
+    # e testar se o nosso bloco `try...except` consegue capturá-lo.
+    if simular == "authn":
+        raise AuthenticationError("Credenciais inválidas")
+    if simular == "authz":
+        raise AuthorizationError("Sem permissão para esta operação")
+    if simular == "limit":
+        raise RateLimitExceededError("Limite de requisições excedido")
+    
+    # Se nenhum erro for simulado, a função retorna sucesso.
+    return "Recurso 'OK' obtido com sucesso."
+
+
+# ==============================================================================
+# 3. DEMONSTRAÇÃO DO BLOCO `try...except...else...finally`
+# ==============================================================================
+
+def demo_tratamento_completo(recurso: str):
+    """
+    Demonstra a estrutura completa de tratamento de exceções.
+    """
+    print(f"\n--- Tentando obter o recurso para o caso: '{recurso}' ---")
+    try:
+        # TENTAMOS executar o código que pode falhar.
+        resultado = mock_obter_recurso(recurso)
+
+    # CAPTURAMOS erros específicos. Podemos agrupar exceções em uma tupla
+    # para dar o mesmo tratamento a elas.
+    except (AuthenticationError, AuthorizationError) as err:
+        print(f"  -> Erro de Acesso Capturado: ({err.__class__.__name__}) {err}")
+
+    # É importante capturar exceções mais específicas ANTES das mais genéricas.
+    # Se `except AppError` viesse primeiro, ele capturaria TODOS os nossos erros
+    # e os blocos mais específicos nunca seriam executados.
+    except AppError as err:
+        print(f"  -> Erro de Aplicação Capturado: ({err.__class__.__name__}) {err}")
+
+    # O bloco ELSE só é executado se NENHUMA exceção ocorrer no bloco `try`.
+    else:
+        print(f"  -> Sucesso! Resultado: {resultado}")
+        print("  -> Bloco ELSE: Executando operações pós-sucesso.")
+
+    # O bloco FINALLY é SEMPRE executado, não importa se houve sucesso,
+    # exceção capturada ou até mesmo uma exceção não capturada.
+    # É ideal para tarefas de "limpeza", como fechar uma conexão de banco de dados.
+    finally:
+        print("  -> Bloco FINALLY: Esta linha sempre aparece (limpeza).")
+
+
+# ==============================================================================
+# 4. ENCADEAMENTO DE EXCEÇÕES (TÓPICO AVANÇADO)
+# ==============================================================================
+# Esta é uma técnica poderosa para traduzir um erro técnico (como um
+# KeyError) em um erro de domínio mais significativo (como ResourceNotFoundError)
+# sem perder a informação do erro original.
+
+def buscar_em_armazenamento(chave: str, dicionario: dict):
+    """Busca uma chave em um dicionário e encadeia exceções em caso de falha."""
+    try:
+        return dicionario[chave]
+    except KeyError as err:
+        # A magia está aqui: `raise ... from ...`
+        # Estamos capturando o `KeyError` e levantando o nosso próprio erro,
+        # mas "anexando" o erro original a ele com `from err`.
+        # Nota: `{chave!r}` usa `repr()` para formatar a string,
+        # o que coloca aspas em volta dela, ótimo para logs e depuração.
+        raise ResourceNotFoundError(f"A chave {chave!r} não foi encontrada.") from err
+
+def demo_encadeamento():
+    """Demonstra como capturar e inspecionar uma exceção encadeada."""
+    print("\n" + "#"*50)
+    print("--- 4. Demonstração de Encadeamento de Exceções ---")
+    dados = {"login_ativo": True}
+    
+    try:
+        buscar_em_armazenamento("usuario", dados)
+    except ResourceNotFoundError as err:
+        # Capturamos o nosso erro de domínio.
+        print(f"\nErro de domínio capturado: {err}")
+        
+        # O professor falou sobre maturidade técnica: não expor o erro técnico
+        # ao usuário final, mas poder investigá-lo.
+        # O atributo `__cause__` nos dá acesso ao erro original que foi "anexado".
+        if err.__cause__ is not None:
+            causa_original = err.__cause__
+            print(f"  -> Causa Original (Erro Técnico): "
+                  f"({causa_original.__class__.__name__}) {causa_original}")
+
+
+# ==============================================================================
+# 5. EXECUÇÃO PRINCIPAL (DRIVER CODE)
+# ==============================================================================
+if __name__ == "__main__":
+    
+    # Demonstração do tratamento de exceções
+    casos_de_teste = ["authn", "authz", "limit", "OK"]
+    for caso in casos_de_teste:
+        demo_tratamento_completo(caso)
+        
+    # Demonstração do encadeamento
+    demo_encadeamento()
